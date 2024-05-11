@@ -147,30 +147,20 @@ function turndown(content, options, article) {
     const langMatch = node.id?.match(/code-lang-(.+)/);
     const language = langMatch?.length > 0 ? langMatch[1] : '';
 
-    var code;
+    const code = node.innerText;
 
-    if (language) {
-      var div = document.createElement('div');
-      document.body.appendChild(div);
-      div.appendChild(node);
-      code = node.innerText;
-      div.remove();
-    } else {
-      code = node.innerHTML;
-    }
+    const fenceChar = options.fence.charAt(0);
+    let fenceSize = 3;
+    const fenceInCodeRegex = new RegExp('^' + fenceChar + '{3,}', 'gm');
 
-    var fenceChar = options.fence.charAt(0);
-    var fenceSize = 3;
-    var fenceInCodeRegex = new RegExp('^' + fenceChar + '{3,}', 'gm');
-
-    var match;
+    let match;
     while ((match = fenceInCodeRegex.exec(code))) {
       if (match[0].length >= fenceSize) {
         fenceSize = match[0].length + 1;
       }
     }
 
-    var fence = repeat(fenceChar, fenceSize);
+    const fence = repeat(fenceChar, fenceSize);
 
     return (
       '\n\n' + fence + language + '\n' +
@@ -195,7 +185,12 @@ function turndown(content, options, article) {
 
   // handle <pre> as code blocks
   turndownService.addRule('pre', {
-    filter: (node, tdopts) => node.nodeName == 'PRE' && (!node.firstChild || node.firstChild.nodeName != 'CODE'),
+    filter: (node, tdopts) => {
+        // console.log('prepre =====', node.nodeName, node)
+      return node.nodeName == 'PRE'
+             && (!node.firstChild || node.firstChild.nodeName === 'CODE')
+             && !node.querySelector('img');
+    },
     replacement: (content, node, tdopts) => {
       return convertToFencedCodeBlock(node, tdopts);
     }
@@ -206,8 +201,8 @@ function turndown(content, options, article) {
 
   // strip out non-printing special characters which CodeMirror displays as a red dot
   // see: https://codemirror.net/doc/manual.html#option_specialChars
-  markdown = markdown.replace(/[\u0000-\u0009\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/g, '');
-  
+  markdown = markdown.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\u00ad\u061c\u200b-\u200f\u2028\u2029\ufeff\ufff9-\ufffc]/g, '');
+
   return { markdown: markdown, imageList: imageList };
 }
 
@@ -249,12 +244,12 @@ function getImageFilename(src, options, prependFilePath = true) {
   else if (prependFilePath) {
     imagePrefix = options.title + (imagePrefix.startsWith('/') ? '' : '/') + imagePrefix
   }
-  
+
   if (filename.includes(';base64,')) {
     // this is a base64 encoded image, so what are we going to do for a filename here?
     filename = 'image.' + filename.substring(0, filename.indexOf(';'));
   }
-  
+
   let extension = filename.substring(filename.lastIndexOf('.'));
   if (extension == filename) {
     // there is no extension, so we need to figure one out
@@ -347,18 +342,18 @@ async function convertArticleToMarkdown(article, downloadImages = null) {
 function generateValidFileName(title, disallowedChars = null) {
   if (!title) return title;
   else title = title + '';
-  // remove < > : " / \ | ? * 
+  // remove < > : " / \ | ? *
   var illegalRe = /[\/\?<>\\:\*\|":]/g;
   // and non-breaking spaces (thanks @Licat)
   var name = title.replace(illegalRe, "").replace(new RegExp('\u00A0', 'g'), ' ');
-  
+
   if (disallowedChars) {
     for (let c of disallowedChars) {
       if (`[\\^$.|?*+()`.includes(c)) c = `\\${c}`;
       name = name.replace(new RegExp(c, 'g'), '');
     }
   }
-  
+
   return name;
 }
 
@@ -428,15 +423,15 @@ async function preDownloadImages(imageList, markdown) {
 async function downloadMarkdown(markdown, title, tabId, imageList = {}, mdClipsFolder = '') {
   // get the options
   const options = await getOptions();
-  
+
   // download via the downloads API
   if (options.downloadMode == 'downloadsApi' && browser.downloads) {
-    
+
     // create the object url with markdown data as a blob
     const url = URL.createObjectURL(new Blob([markdown], {
       type: "text/markdown;charset=utf-8"
     }));
-  
+
     try {
 
       if(mdClipsFolder && !mdClipsFolder.endsWith('/')) mdClipsFolder += '/';
@@ -488,7 +483,7 @@ async function downloadMarkdown(markdown, title, tabId, imageList = {}, mdClipsF
   //     // the page, for example if the tab is a privileged page.
   //     console.error("Failed to execute script: " + error);
   //   };
-    
+
   // }
   // download via content link
   else {
@@ -519,7 +514,7 @@ function downloadListener(id, url) {
 }
 
 function base64EncodeUnicode(str) {
-  // Firstly, escape the string using encodeURIComponent to get the UTF-8 encoding of the characters, 
+  // Firstly, escape the string using encodeURIComponent to get the UTF-8 encoding of the characters,
   // Secondly, we convert the percent encodings into raw bytes, and add it to btoa() function.
   const utf8Bytes = encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, function (match, p1) {
     return String.fromCharCode('0x' + p1);
@@ -541,7 +536,7 @@ async function notify(message) {
     if (message.selection && message.clipSelection) {
       article.content = message.selection;
     }
-    
+
     // convert the article to markdown
     const { markdown, imageList } = await convertArticleToMarkdown(article);
 
@@ -641,7 +636,7 @@ async function toggleSetting(setting, options = null) {
         });
       } catch { }
     }
-    
+
     if (setting == "downloadImages") {
       browser.contextMenus.update("toggle-downloadImages", {
         checked: options.downloadImages
@@ -671,6 +666,7 @@ async function getArticleFromDom(domString) {
   // parse the dom
   const parser = new DOMParser();
   const dom = parser.parseFromString(domString, "text/html");
+
 
   if (dom.documentElement.nodeName == "parsererror") {
     console.error("error while parsing");
@@ -741,13 +737,21 @@ async function getArticleFromDom(domString) {
 
   dom.body.querySelectorAll('h1, h2, h3, h4, h5, h6')?.forEach(header => {
     // Readability.js will strip out headings from the dom if certain words appear in their className
-    // See: https://github.com/mozilla/readability/issues/807  
+    // See: https://github.com/mozilla/readability/issues/807
     header.className = '';
-    header.outerHTML = header.outerHTML;  
+    header.outerHTML = header.outerHTML;
   });
 
+  console.log('dom == 2222 == ', dom.body.querySelectorAll('.extra-class'))
+
   // simplify the dom into an article
-  const article = new Readability(dom).parse();
+  const article = new Readability(dom, {
+    debug: true,
+    // keepClasses: true,
+    classesToPreserve: ['extra-class']
+  }).parse();
+
+//   console.log('article == ', article)
 
   // get the base uri from the dom and attach it as important article info
   article.baseURI = dom.baseURI;
@@ -763,7 +767,7 @@ async function getArticleFromDom(domString) {
   article.port = url.port;
   article.protocol = url.protocol;
   article.search = url.search;
-  
+
 
   // make sure the dom has a head
   if (dom.head) {
@@ -811,7 +815,7 @@ async function getArticleFromContent(tabId, selection = false) {
 // function to apply the title template
 async function formatTitle(article) {
   let options = await getOptions();
-  
+
   let title = textReplace(options.title, article, options.disallowedChars + '/');
   title = title.split('/').map(s=>generateValidFileName(s, options.disallowedChars)).join('/');
   return title;
@@ -851,7 +855,7 @@ async function downloadMarkdownFromContext(info, tab) {
   const { markdown, imageList } = await convertArticleToMarkdown(article);
   // format the mdClipsFolder
   const mdClipsFolder = await formatMdClipsFolder(article);
-  await downloadMarkdown(markdown, title, tab.id, imageList, mdClipsFolder); 
+  await downloadMarkdown(markdown, title, tab.id, imageList, mdClipsFolder);
 
 }
 
@@ -879,7 +883,7 @@ async function copyTabAsMarkdownLinkAll(tab) {
     const tabs = await browser.tabs.query({
       currentWindow: true
     });
-    
+
     const links = [];
     for(const tab of tabs) {
       await ensureScripts(tab.id);
@@ -888,7 +892,7 @@ async function copyTabAsMarkdownLinkAll(tab) {
       const link = `${options.bulletListMarker} [${title}](${article.baseURI})`
       links.push(link)
     };
-    
+
     const markdown = links.join(`\n`)
     await browser.tabs.executeScript(tab.id, { code: `copyToClipboard(${JSON.stringify(markdown)})` });
 

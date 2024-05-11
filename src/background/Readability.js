@@ -929,7 +929,8 @@ Readability.prototype = {
               !this._hasAncestorTag(node, "table") &&
               !this._hasAncestorTag(node, "code") &&
               node.tagName !== "BODY" &&
-              node.tagName !== "A") {
+              node.tagName !== "A" &&
+              node.className.indexOf('extra-class') === -1) {
             this.log("Removing unlikely candidate - " + matchString);
             node = this._removeAndGetNext(node);
             continue;
@@ -960,6 +961,7 @@ Readability.prototype = {
           // Put phrasing content into paragraphs.
           var p = null;
           var childNode = node.firstChild;
+        //   console.log('DIV childNode === ', childNode)
           while (childNode) {
             var nextSibling = childNode.nextSibling;
             if (this._isPhrasingContent(childNode)) {

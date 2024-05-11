@@ -159,11 +159,17 @@ var TurndownService = (function () {
 
   rules.indentedCodeBlock = {
     filter: function (node, options) {
+        let _node = node
+        // console.log('_node.className', _node.className)
+        const isCodeWrap =  _node.nodeName === 'DIV' && _node.className.indexOf('language-js') > -1
+        if (isCodeWrap) {
+            _node = _node.firstChild
+        }
       return (
         options.codeBlockStyle === 'indented' &&
-        node.nodeName === 'PRE' &&
-        node.firstChild &&
-        node.firstChild.nodeName === 'CODE'
+        _node.nodeName === 'PRE' &&
+        _node.firstChild &&
+        _node.firstChild.nodeName === 'CODE'
       )
     },
 
@@ -178,11 +184,16 @@ var TurndownService = (function () {
 
   rules.fencedCodeBlock = {
     filter: function (node, options) {
+        let _node = node
+        const isCodeWrap =  _node.nodeName === 'DIV' && _node.className.indexOf('language-js') > -1
+        if (isCodeWrap) {
+            _node = _node.firstChild
+        }
       return (
         options.codeBlockStyle === 'fenced' &&
-        node.nodeName === 'PRE' &&
-        node.firstChild &&
-        node.firstChild.nodeName === 'CODE'
+        _node.nodeName === 'PRE' &&
+        _node.firstChild &&
+        _node.firstChild.nodeName === 'CODE'
       )
     },
 
